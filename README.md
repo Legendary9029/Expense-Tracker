@@ -148,8 +148,8 @@ This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) f
 ## Contact 📧
 
 For any questions or feedback, feel free to reach out:
-- **Your Name** - [your.email@example.com](mailto:adityasinha1304@gmai.com)
-- **GitHub**: [your-username](https://github.com/legendary9029)
+- **Gmail** - [adityasinha1304@gmai.com](mailto:adityasinha1304@gmai.com)
+- **GitHub**: [Legendary9029](https://github.com/legendary9029)
 
 ---
 
