@@ -176,7 +176,7 @@ expense_tracker/
 │
 ├── app.py                # Streamlit UI and interaction
 │
-├── venv/                 # Virtual environment folder
+├── venv/                 # Virtual environment folder (not pushed to GitHub)
 ├── .env                  # Stores email credentials (not pushed to GitHub)
 ├── requirements.txt      # Dependencies
 └── README.md             # Project documentation
