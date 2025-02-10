@@ -34,6 +34,8 @@ from backend.utils import (
     extract_text_from_image,
     send_email_notification,
 )
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # Initialize database
 init_db()
