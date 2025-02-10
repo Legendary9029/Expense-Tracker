@@ -47,13 +47,33 @@ st.title("💰 Expense Tracker")
 # Dark Mode Toggle
 st.sidebar.header("Settings")
 dark_mode = st.sidebar.checkbox("Dark Mode")
+
 if dark_mode:
     st.markdown(
         """
         <style>
         .stApp {
-            background-color: #1e1e1e;
+            background: linear-gradient(to bottom, #121212, #1e1e1e);
+            color: #e0e0e0;
+        }
+        .stButton>button {
+            background-color: #444;
             color: #ffffff;
+            border-radius: 5px;
+            border: 1px solid #666;
+        }
+        .stTextInput>div>div>input {
+            background-color: #2b2b2b;
+            color: #ffffff;
+            border: 1px solid #444;
+        }
+        .stDataFrame {
+            background-color: #2b2b2b;
+            color: #ffffff;
+            border-radius: 8px;
+        }
+        .css-1d391kg {
+            background-color: #333 !important;
         }
         </style>
         """,
