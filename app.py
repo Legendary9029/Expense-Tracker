@@ -37,9 +37,10 @@ def login_signup_page():
                 st.experimental_rerun()
             else:
                 st.error(message)
-    else:
+    elif choice == "Signup":
+        email = st.text_input("Email")  # Add email input
         if st.button("Signup"):
-            success, message = create_user(username, password)
+            success, message = create_user(username, password, email)
             if success:
                 st.success(message)
             else:

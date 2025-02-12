@@ -7,6 +7,7 @@
 ## Features ✨
 
 ### **Core Features**
+- **User Authentication**: Secure login and registration.
 - **Add Expenses**: Input date, category, description, and amount.
 - **View Expenses**: Display all expenses in a table.
 - **Categorize Expenses**: Group expenses by categories (e.g., Food, Transport, Entertainment).
@@ -17,6 +18,9 @@
 - **Edit/Delete Expenses**: Modify or remove existing entries.
 
 ### **New Features**
+- **MongoDB Integration**: Replaced SQLite with MongoDB for scalable storage.
+- **Personalized Expenses**: Each user has their own expense data.
+- **Daily Expenses Visualization**: Added a chart to visualize daily spending.
 - **Recurring Expenses**: Set up recurring expenses (e.g., rent, subscriptions).
 - **Income Tracking**: Track income sources and calculate savings.
 - **Expense Splitting**: Split an expense with friends or family.
@@ -32,9 +36,9 @@
 ## Technologies Used 🛠️
 
 - **Frontend**: Streamlit
-- **Backend**: Python (Pandas, SQLite)
+- **Backend**: Python (Pandas, MongoDB, PyMongo)
 - **Visualization**: Matplotlib, Seaborn
-- **Database**: SQLite
+- **Database**: MongoDB (Atlas or local instance)
 - **AI/ML**: Scikit-learn
 - **OCR**: pytesseract
 - **Email Notifications**: smtplib
@@ -48,6 +52,7 @@ Follow these steps to set up the project on your local machine.
 ### Prerequisites
 - Python 3.7 or higher
 - pip (Python package manager)
+- MongoDB (Atlas or local instance)
 
 ### Steps
 1. **Clone the Repository**:
@@ -81,18 +86,16 @@ Follow these steps to set up the project on your local machine.
    pip install -r requirements.txt
    ```
 
-5. **Set Up Email Credentials Securely**:
+5. **Set Up MongoDB Connection**:
    - Create a `.env` file in the project root directory:
      ```
-     EMAIL_USER=your-email@gmail.com
-     EMAIL_PASS=your-email-password
+     MONGO_URI=mongodb+srv://your-username:your-password@cluster0.mongodb.net/expense_tracker
      ```
-   - **Ensure the `.env` file is added to `.gitignore`** to prevent exposing credentials:
+   - Ensure the `.env` file is added to `.gitignore`:
      ```
      # Ignore environment variables file
      .env
      ```
-   - The application will automatically load the credentials using `python-dotenv`.
 
 6. **Run the Application**:
    ```bash
@@ -107,6 +110,10 @@ Follow these steps to set up the project on your local machine.
 
 ## Usage Guide 📚
 
+### User Authentication
+- Sign up with a **username, password, and email**.
+- Log in to view and manage your expenses.
+
 ### Adding an Expense
 1. Open the sidebar by clicking the **>** button in the top-left corner.
 2. Fill in the date, category, description, and amount.
@@ -116,39 +123,22 @@ Follow these steps to set up the project on your local machine.
 1. In the sidebar, fill in the start date, end date (optional), category, description, amount, and frequency.
 2. Click **Add Recurring Expense**.
 
-### Adding Income
-1. In the sidebar, fill in the income date, source, description, and amount.
-2. Click **Add Income**.
-
 ### Viewing Expenses
 - The main page displays a table of all expenses.
 - Use the **Filter Expenses** section to filter by date range, category, or amount.
 
-### Visualizations
-- View **Monthly Spending** and **Category-wise Breakdown** charts on the main page.
+### Budget Tracking & Email Alerts
+- Set a monthly budget.
+- Enter your email for budget notifications.
+- Receive alerts if you exceed or approach your budget.
 
 ### Exporting Data
 - Click **Export to CSV** or **Export to Excel** to download your expense data.
-
-### Budget Tracking
-- Set a monthly budget in the **Budget Tracking** section.
-- The app will display your total spending and remaining budget.
-- You will receive email notifications if you exceed or approach your budget.
-
-### Splitting Expenses
-1. Select an expense to split.
-2. Enter the total amount to split and the number of people.
-3. Provide the names of the people involved.
-4. Click **Split Expense**.
 
 ### Multi-Currency Support
 1. Select the base currency and expense currency.
 2. Enter the amount in the expense currency.
 3. Click **Convert to Base Currency**.
-
-### Debt & Loan Tracking
-1. Fill in the debt/loan date, person name, description, amount, and type.
-2. Click **Add Debt/Loan**.
 
 ### OCR-Based Receipt Upload
 1. Upload a receipt image (PNG, JPG, JPEG).
@@ -170,14 +160,17 @@ expense_tracker/
 │
 ├── backend/
 │   ├── __init__.py
-│   ├── database.py       # Handles database operations
+│   ├── database.py       # Handles MongoDB operations
 │   ├── expenses.py       # Handles expense-related logic
+│   ├── auth.py           # User authentication logic
 │   └── utils.py          # Utility functions (e.g., data validation, notifications)
 │
-├── app.py                # Streamlit UI and interaction
+├── frontend/
+│   ├── app.py            # Streamlit UI and interaction
+│   ├── components.py     # UI components
 │
 ├── venv/                 # Virtual environment folder (not pushed to GitHub)
-├── .env                  # Stores email credentials (not pushed to GitHub)
+├── .env                  # Stores database credentials (not pushed to GitHub)
 ├── requirements.txt      # Dependencies
 └── README.md             # Project documentation
 ```
@@ -210,4 +203,3 @@ For any questions or feedback, feel free to reach out:
 ---
 
 Enjoy tracking your expenses! 💸
-

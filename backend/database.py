@@ -1,3 +1,5 @@
+import email
+
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 import bcrypt
@@ -55,7 +57,7 @@ def is_strong_password(password):
         return False, "Password must contain at least one special character."
     return True, ""
 
-def create_user(username, password):
+def create_user(username, password, email):  # Add email as a parameter
     if users_collection.find_one({"username": username}):
         return False, "Username already exists."
 
@@ -64,9 +66,13 @@ def create_user(username, password):
     if not is_valid:
         return False, message
 
-    hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
-    users_collection.insert_one({"username": username, "password": hashed_password})
-    return True, "User created successfully."
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+    # Ensure the email is stored in the database
+    users_collection.insert_one({"username": username, "password": hashed_password, "email": email})
+
+    return True, "Account created successfully!"
+
 
 def authenticate_user(username, password):
     user = users_collection.find_one({"username": username})
