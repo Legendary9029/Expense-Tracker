@@ -1,174 +1,175 @@
-import sqlite3
-from datetime import datetime
+from pymongo import MongoClient
+from bson.objectid import ObjectId
+import bcrypt
+from dotenv import load_dotenv
+import os
+from datetime import datetime, timedelta, date
+from urllib.parse import quote_plus
 
-# Database connection
-def get_db_connection():
-    conn = sqlite3.connect("expenses.db")
-    conn.row_factory = sqlite3.Row
-    return conn
+# Load environment variables
+load_dotenv()
 
-# Initialize database
-def init_db():
-    conn = get_db_connection()
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS expenses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date DATE NOT NULL,
-            category TEXT NOT NULL,
-            description TEXT,
-            amount REAL NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS recurring_expenses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            start_date DATE NOT NULL,
-            end_date DATE,
-            category TEXT NOT NULL,
-            description TEXT,
-            amount REAL NOT NULL,
-            frequency TEXT NOT NULL  -- e.g., 'monthly', 'weekly'
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS income (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date DATE NOT NULL,
-            source TEXT NOT NULL,
-            description TEXT,
-            amount REAL NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS split_expenses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            expense_id INTEGER NOT NULL,
-            person_name TEXT NOT NULL,
-            amount REAL NOT NULL,
-            FOREIGN KEY (expense_id) REFERENCES expenses (id)
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS debts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date DATE NOT NULL,
-            person_name TEXT NOT NULL,
-            description TEXT,
-            amount REAL NOT NULL,
-            type TEXT NOT NULL  -- 'debt' or 'loan'
-        )
-        """
-    )
-    conn.commit()
-    conn.close()
+# Get MongoDB URI from .env
+MONGODB_URI = os.getenv("MONGODB_URI")
 
-# Add expense to database
-def add_expense(date, category, description, amount):
-    conn = get_db_connection()
-    conn.execute(
-        "INSERT INTO expenses (date, category, description, amount) VALUES (?, ?, ?, ?)",
-        (date, category, description, amount),
-    )
-    conn.commit()
-    conn.close()
+# Validate URI
+if not MONGODB_URI:
+    raise ValueError("MONGODB_URI is not set in the environment variables.")
 
-# Fetch all expenses
-def get_all_expenses():
-    conn = get_db_connection()
-    expenses = conn.execute("SELECT * FROM expenses").fetchall()
-    conn.close()
-    return expenses
+# Increase timeout to 60 seconds
+client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=60000)
+db = client["expense_tracker"]
 
-# Delete expense by ID
+# Collections
+users_collection = db["users"]
+expenses_collection = db["expenses"]
+income_collection = db["income"]
+
+try:
+    # Test connection
+    client.server_info()
+    print("✅ Connected to MongoDB successfully!")
+except Exception as e:
+    print(f"❌ MongoDB Connection Error: {e}")
+
+# User Authentication
+def create_user(username, password):
+    if users_collection.find_one({"username": username}):
+        return False, "Username already exists."
+    hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+    users_collection.insert_one({"username": username, "password": hashed_password})
+    return True, "User created successfully."
+
+def authenticate_user(username, password):
+    user = users_collection.find_one({"username": username})
+    if user and bcrypt.checkpw(password.encode("utf-8"), user["password"]):
+        return True, "Authentication successful."
+    return False, "Invalid username or password."
+
+# Expense Operations
+def add_expense(username, date_value, category, description, amount, currency="USD", recurring=False, recurrence_period=None):
+    try:
+        # Convert date to datetime object
+        if isinstance(date_value, str):
+            date_obj = datetime.strptime(date_value, "%Y-%m-%d")
+        elif isinstance(date_value, date):  # Now we can properly check for date type
+            date_obj = datetime.combine(date_value, datetime.min.time())
+        elif isinstance(date_value, datetime):
+            date_obj = date_value
+        else:
+            return False, f"Invalid date type: {type(date_value)}"
+
+        expense = {
+            "username": username,
+            "date": date_obj,
+            "category": category,
+            "description": description,
+            "amount": float(amount),
+            "currency": currency,
+            "recurring": recurring,
+            "recurrence_period": recurrence_period if recurring and recurrence_period else None
+        }
+        expenses_collection.insert_one(expense)
+
+        if recurring and recurrence_period and isinstance(recurrence_period, int):
+            for i in range(1, 12):  # Auto-generate 12 future occurrences
+                next_date = date_obj + timedelta(days=recurrence_period * i)
+                expense_copy = expense.copy()
+                expense_copy["date"] = next_date
+                expenses_collection.insert_one(expense_copy)
+
+        return True, "Expense added successfully."
+    except ValueError as e:
+        return False, f"Invalid date format: {str(e)}"
+    except Exception as e:
+        return False, f"Error adding expense: {str(e)}"
+
+def get_expenses(username):
+    expenses = list(expenses_collection.find({"username": username}, {"_id": 0}))
+    return expenses if expenses else []
+
 def delete_expense(expense_id):
-    conn = get_db_connection()
-    conn.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
-    conn.commit()
-    conn.close()
+    if not ObjectId.is_valid(expense_id):
+        return False, "Invalid expense ID."
+    result = expenses_collection.delete_one({"_id": ObjectId(expense_id)})
+    return True, "Expense deleted." if result.deleted_count else False, "Expense not found."
 
-# Update expense by ID
-def update_expense(expense_id, date, category, description, amount):
-    conn = get_db_connection()
-    conn.execute(
-        "UPDATE expenses SET date = ?, category = ?, description = ?, amount = ? WHERE id = ?",
-        (date, category, description, amount, expense_id),
+def update_expense(expense_id, date, category, description, amount, currency="USD"):
+    if not ObjectId.is_valid(expense_id):
+        return False, "Invalid expense ID."
+
+    try:
+        if isinstance(date, str):
+            date = datetime.strptime(date, "%Y-%m-%d")  # Ensure correct date format
+        elif isinstance(date, datetime.date):
+            date = datetime.combine(date, datetime.min.time())  # Convert date to datetime
+    except ValueError:
+        return False, "Invalid date format. Use YYYY-MM-DD."
+
+    update_data = {
+        "date": date,
+        "category": category,
+        "description": description,
+        "amount": float(amount),
+        "currency": currency
+    }
+
+    result = expenses_collection.update_one(
+        {"_id": ObjectId(expense_id)}, {"$set": update_data}
     )
-    conn.commit()
-    conn.close()
 
-# Add recurring expense
-def add_recurring_expense(start_date, end_date, category, description, amount, frequency):
-    conn = get_db_connection()
-    conn.execute(
-        "INSERT INTO recurring_expenses (start_date, end_date, category, description, amount, frequency) VALUES (?, ?, ?, ?, ?, ?)",
-        (start_date, end_date, category, description, amount, frequency),
+    return True, "Expense updated." if result.modified_count else False, "Expense not found or no change made."
+
+# Income Tracking
+def add_income(username, date, source, amount, currency="USD"):
+    try:
+        if isinstance(date, str):
+            date = datetime.strptime(date, "%Y-%m-%d")  # Ensure correct date format
+        elif isinstance(date, datetime.date):
+            date = datetime.combine(date, datetime.min.time())  # Convert date to datetime
+    except ValueError:
+        return False, "Invalid date format. Use YYYY-MM-DD."
+
+    income_collection.insert_one({
+        "username": username,
+        "date": date,
+        "source": source,
+        "amount": float(amount),
+        "currency": currency
+    })
+    return True, "Income added successfully."
+
+def get_income(username):
+    income = list(income_collection.find({"username": username}, {"_id": 0}))
+    return income if income else []
+
+def delete_income(income_id):
+    if not ObjectId.is_valid(income_id):
+        return False, "Invalid income ID."
+    result = income_collection.delete_one({"_id": ObjectId(income_id)})
+    return True, "Income deleted." if result.deleted_count else False, "Income not found."
+
+def update_income(income_id, date, source, amount, currency="USD"):
+    if not ObjectId.is_valid(income_id):
+        return False, "Invalid income ID."
+
+    try:
+        if isinstance(date, str):
+            date = datetime.strptime(date, "%Y-%m-%d")  # Ensure correct date format
+        elif isinstance(date, datetime.date):
+            date = datetime.combine(date, datetime.min.time())  # Convert date to datetime
+    except ValueError:
+        return False, "Invalid date format. Use YYYY-MM-DD."
+
+    update_data = {
+        "date": date,
+        "source": source,
+        "amount": float(amount),
+        "currency": currency
+    }
+
+    result = income_collection.update_one(
+        {"_id": ObjectId(income_id)}, {"$set": update_data}
     )
-    conn.commit()
-    conn.close()
 
-# Fetch all recurring expenses
-def get_recurring_expenses():
-    conn = get_db_connection()
-    expenses = conn.execute("SELECT * FROM recurring_expenses").fetchall()
-    conn.close()
-    return expenses
-
-# Add income
-def add_income(date, source, description, amount):
-    conn = get_db_connection()
-    conn.execute(
-        "INSERT INTO income (date, source, description, amount) VALUES (?, ?, ?, ?)",
-        (date, source, description, amount),
-    )
-    conn.commit()
-    conn.close()
-
-# Fetch all income
-def get_all_income():
-    conn = get_db_connection()
-    income = conn.execute("SELECT * FROM income").fetchall()
-    conn.close()
-    return income
-
-# Add split expense
-def add_split_expense(expense_id, person_name, amount):
-    conn = get_db_connection()
-    conn.execute(
-        "INSERT INTO split_expenses (expense_id, person_name, amount) VALUES (?, ?, ?)",
-        (expense_id, person_name, amount),
-    )
-    conn.commit()
-    conn.close()
-
-# Fetch split expenses for a given expense ID
-def get_split_expenses(expense_id):
-    conn = get_db_connection()
-    splits = conn.execute("SELECT * FROM split_expenses WHERE expense_id = ?", (expense_id,)).fetchall()
-    conn.close()
-    return splits
-
-# Add debt/loan
-def add_debt(date, person_name, description, amount, type):
-    conn = get_db_connection()
-    conn.execute(
-        "INSERT INTO debts (date, person_name, description, amount, type) VALUES (?, ?, ?, ?, ?)",
-        (date, person_name, description, amount, type),
-    )
-    conn.commit()
-    conn.close()
-
-# Fetch all debts/loans
-def get_all_debts():
-    conn = get_db_connection()
-    debts = conn.execute("SELECT * FROM debts").fetchall()
-    conn.close()
-    return debts
+    return True, "Income updated." if result.modified_count else False, "Income not found or no change made."
