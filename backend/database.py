@@ -32,10 +32,38 @@ try:
 except Exception as e:
     print(f"❌ MongoDB Connection Error: {e}")
 
-# User Authentication
+import re
+
+def is_strong_password(password):
+    """
+    Check if the password is strong:
+    - At least 8 characters
+    - Contains at least one uppercase letter
+    - Contains at least one lowercase letter
+    - Contains at least one digit
+    - Contains at least one special character
+    """
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long."
+    if not re.search(r"[A-Z]", password):
+        return False, "Password must contain at least one uppercase letter."
+    if not re.search(r"[a-z]", password):
+        return False, "Password must contain at least one lowercase letter."
+    if not re.search(r"\d", password):
+        return False, "Password must contain at least one digit."
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return False, "Password must contain at least one special character."
+    return True, ""
+
 def create_user(username, password):
     if users_collection.find_one({"username": username}):
         return False, "Username already exists."
+
+    # Validate password strength
+    is_valid, message = is_strong_password(password)
+    if not is_valid:
+        return False, message
+
     hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
     users_collection.insert_one({"username": username, "password": hashed_password})
     return True, "User created successfully."
@@ -173,3 +201,58 @@ def update_income(income_id, date, source, amount, currency="USD"):
     )
 
     return True, "Income updated." if result.modified_count else False, "Income not found or no change made."
+
+# Add these collections
+recurring_expenses_collection = db["recurring_expenses"]
+split_expenses_collection = db["split_expenses"]
+debts_collection = db["debts"]
+
+# Recurring Expenses
+def add_recurring_expense(username, start_date, end_date, category, description, amount, frequency):
+    recurring_expense = {
+        "username": username,
+        "start_date": start_date,
+        "end_date": end_date,
+        "category": category,
+        "description": description,
+        "amount": float(amount),
+        "frequency": frequency
+    }
+    recurring_expenses_collection.insert_one(recurring_expense)
+    return True, "Recurring expense added successfully."
+
+def get_recurring_expenses(username):
+    expenses = list(recurring_expenses_collection.find({"username": username}, {"_id": 0}))
+    return expenses if expenses else []
+
+# Expense Splitting
+def add_split_expense(username, expense_id, person_name, amount):
+    split_expense = {
+        "username": username,
+        "expense_id": expense_id,
+        "person_name": person_name,
+        "amount": float(amount)
+    }
+    split_expenses_collection.insert_one(split_expense)
+    return True, "Expense split successfully."
+
+def get_split_expenses(username, expense_id):
+    splits = list(split_expenses_collection.find({"username": username, "expense_id": expense_id}, {"_id": 0}))
+    return splits if splits else []
+
+# Debt & Loan Tracking
+def add_debt(username, date, person_name, description, amount, type):
+    debt = {
+        "username": username,
+        "date": date,
+        "person_name": person_name,
+        "description": description,
+        "amount": float(amount),
+        "type": type
+    }
+    debts_collection.insert_one(debt)
+    return True, "Debt/Loan added successfully."
+
+def get_debts(username):
+    debts = list(debts_collection.find({"username": username}, {"_id": 0}))
+    return debts if debts else []
