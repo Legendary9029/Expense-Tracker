@@ -1,5 +1,5 @@
 import email
-
+import streamlit as st
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 import bcrypt
@@ -11,15 +11,16 @@ from urllib.parse import quote_plus
 # Load environment variables
 load_dotenv()
 
-# Get MongoDB URI from .env
-MONGODB_URI = os.getenv("MONGODB_URI")
 
-# Validate URI
-if not MONGODB_URI:
-    raise ValueError("MONGODB_URI is not set in the environment variables.")
+# Get MongoDB URI - prioritize .env, fallback to Streamlit Secrets
+MONGO_URI = os.getenv("MONGO_URI", st.secrets.get("MONGO_URI"))
 
-# Increase timeout to 60 seconds
-client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=60000)
+if not MONGO_URI:
+    st.error("MongoDB URI is missing! Please set MONGO_URI in .env or Streamlit Secrets.")
+    st.stop()
+
+# Connect to MongoDB
+client = MongoClient(MONGO_URI)
 db = client["expense_tracker"]
 
 # Collections
